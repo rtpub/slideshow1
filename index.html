@@ -1,29 +1,31 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Drive Slideshow (Dynamic)</title>
+  <title>Google Drive Slideshow</title>
   <style>
-    body {
+    html, body {
       margin: 0;
+      padding: 0;
       background: black;
       font-family: sans-serif;
       color: white;
       overflow: hidden;
     }
-    img {
+
+    img, iframe {
       width: 100vw;
-      height: calc(100vh - 60px);
+      height: calc(var(--vh, 1vh) * 100 - 60px);
       object-fit: contain;
       display: block;
       margin: auto;
       z-index: 0;
-    }
-    iframe {
-      width: 100vw;
-      height: calc(100vh - 60px);
-      display: none;
       border: none;
     }
+
+    iframe {
+      display: none;
+    }
+
     #caption {
       position: absolute;
       bottom: 10px;
@@ -34,6 +36,7 @@
       font-size: 1em;
       z-index: 3;
     }
+
     #controls {
       position: absolute;
       bottom: 10px;
@@ -41,6 +44,7 @@
       transform: translateX(-50%);
       z-index: 3;
     }
+
     #delay-controls {
       position: absolute;
       bottom: 10px;
@@ -49,9 +53,11 @@
       display: flex;
       align-items: center;
     }
+
     #delay-label {
       margin-right: 8px;
     }
+
     #delay-display {
       min-width: 50px;
       text-align: center;
@@ -63,6 +69,7 @@
       color: white;
       font-weight: bold;
     }
+
     button {
       padding: 8px 12px;
       margin: 5px 3px;
@@ -73,6 +80,7 @@
       color: white;
       cursor: pointer;
     }
+
     button:hover {
       background: rgba(255, 255, 255, 0.4);
     }
@@ -97,9 +105,16 @@
     <button id="next">Next</button>
   </div>
 
-  <script>            
-    
-  //  const folderId = "1NHpXebiiRUuhgnZAQq1Wo5n0XXJQR-8z";
+  <script>
+    // ✅ Safari Mobile Viewport Fix
+    function setVh() {
+      let vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    }
+    setVh();
+    window.addEventListener('resize', setVh);
+
+    // ✅ Your live config
     const folderId = "1hI-YH9BCq1_KifqWwB6HOipBXIo9XEy4";
     const apiKey = "AIzaSyDNOs99iC89rCLbHEiLZfwmX9WaMu3dXM4";
 
