@@ -1,93 +1,207 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Google Drive Thumbnail Slideshow</title>
+  <title>Drive Slideshow (Dynamic)</title>
   <style>
     body {
       margin: 0;
       background: black;
       font-family: sans-serif;
       color: white;
+      overflow: hidden;
     }
     img {
       width: 100vw;
-      height: 100vh;
+      height: calc(100vh - 60px);
       object-fit: contain;
       display: block;
       margin: auto;
+      z-index: 0;
+    }
+    iframe {
+      width: 100vw;
+      height: calc(100vh - 60px);
+      display: none;
+      border: none;
     }
     #caption {
       position: absolute;
-      top: 20px;
+      bottom: 10px;
       left: 20px;
       background: rgba(0, 0, 0, 0.5);
-      padding: 10px;
+      padding: 8px 12px;
       border-radius: 8px;
-      font-size: 1.2em;
+      font-size: 1em;
+      z-index: 3;
     }
-    #error {
+    #controls {
       position: absolute;
-      bottom: 20px;
-      left: 20px;
-      background: rgba(0, 0, 0, 0.5);
-      color: red;
-      padding: 10px;
-      border-radius: 8px;
-      display: none;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+    }
+    #delay-controls {
+      position: absolute;
+      bottom: 10px;
+      right: 20px;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+    }
+    #delay-label {
+      margin-right: 8px;
+    }
+    #delay-display {
+      min-width: 50px;
+      text-align: center;
+      padding: 5px 10px;
+      margin: 0 5px;
+      font-size: 1em;
+      background: none;
+      border: none;
+      color: white;
+      font-weight: bold;
+    }
+    button {
+      padding: 8px 12px;
+      margin: 5px 3px;
+      font-size: 1em;
+      border-radius: 5px;
+      border: 1px solid white;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: rgba(255, 255, 255, 0.4);
     }
   </style>
 </head>
 <body>
+
   <div id="caption">Loading...</div>
   <img id="slideshow" src="" alt="Slideshow">
-  <div id="error"></div>
+  <iframe id="videoFrame" allowfullscreen></iframe>
 
-  <script>
-    const images = [
-      {
-        url: "https://drive.google.com/thumbnail?id=19KsRY7IJ-KfDQQvm6epLdHq4q2nMUFSf&sz=w1000",
-        name: "Sample Image 1"
-      },
-      {
-        url: "https://drive.google.com/thumbnail?id=1uDUh-Uzr9nusWu9F7vD-MFANfVN05q5a&sz=w1000",
-        name: "Sample Image 2"
-      },
-      {
-        url: "https://drive.google.com/thumbnail?id=1NHpXebiiRUuhgnZAQq1Wo5n0XXJQR-8z&sz=w1000",
-        name: "Sample Image 3"
-      }
-    ];
+  <div id="delay-controls">
+    <span id="delay-label">Slide delay:</span>
+    <button id="decreaseDelay">-</button>
+    <span id="delay-display">4 sec</span>
+    <button id="increaseDelay">+</button>
+  </div>
 
+  <div id="controls">
+    <button id="prev">Prev</button>
+    <button id="playPause">Pause</button>
+    <button id="next">Next</button>
+  </div>
+
+  <script>            
+    
+  //  const folderId = "1NHpXebiiRUuhgnZAQq1Wo5n0XXJQR-8z";
+    const folderId = "1hI-YH9BCq1_KifqWwB6HOipBXIo9XEy4";
+    const apiKey = "AIzaSyDNOs99iC89rCLbHEiLZfwmX9WaMu3dXM4";
+
+    let media = [];
     let index = 0;
-    const delay = 4000;
+    let delay = 4000;
+    let interval;
+    let isPlaying = true;
+
     const img = document.getElementById("slideshow");
+    const video = document.getElementById("videoFrame");
     const caption = document.getElementById("caption");
-    const error = document.getElementById("error");
+    const delayDisplay = document.getElementById("delay-display");
 
-    function showImage(i) {
-      const image = images[i];
-      error.style.display = 'none';
+    function fetchMedia() {
+      const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+(mimeType+contains+'image/' or mimeType+contains+'video/')&fields=files(id,name,mimeType)&key=${apiKey}`;
 
-      img.onload = () => {
-        caption.innerText = `Photo ${i + 1} of ${images.length}: ${image.name}`;
-      };
-
-      img.onerror = () => {
-        error.innerText = `⚠️ Failed to load: ${image.name}`;
-        error.style.display = 'block';
-        setTimeout(showNextImage, 2000);
-      };
-
-      img.src = image.url;
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          media = data.files.map(file => {
+            const isImage = file.mimeType.startsWith("image/");
+            return {
+              id: file.id,
+              name: file.name,
+              type: isImage ? "image" : "video",
+              url: isImage
+                ? `https://drive.google.com/thumbnail?id=${file.id}&sz=w1000`
+                : `https://drive.google.com/file/d/${file.id}/preview`
+            };
+          });
+          showMedia(0);
+          interval = setInterval(showNext, delay);
+        });
     }
 
-    function showNextImage() {
-      showImage(index);
-      index = (index + 1) % images.length;
+    function showMedia(i) {
+      const file = media[i];
+      caption.textContent = `Slide ${i + 1} of ${media.length}: ${file.name}`;
+      if (file.type === "image") {
+        img.src = file.url;
+        img.style.display = "block";
+        video.style.display = "none";
+      } else {
+        video.src = file.url;
+        video.style.display = "block";
+        img.style.display = "none";
+      }
     }
 
-    showNextImage();
-    setInterval(showNextImage, delay);
+    function showNext() {
+      index = (index + 1) % media.length;
+      showMedia(index);
+    }
+
+    function showPrev() {
+      index = (index - 1 + media.length) % media.length;
+      showMedia(index);
+    }
+
+    function togglePlayPause() {
+      if (isPlaying) {
+        clearInterval(interval);
+        document.getElementById("playPause").innerText = "Play";
+      } else {
+        interval = setInterval(showNext, delay);
+        document.getElementById("playPause").innerText = "Pause";
+      }
+      isPlaying = !isPlaying;
+    }
+
+    function updateDelayDisplay() {
+      delayDisplay.textContent = `${delay / 1000} sec`;
+    }
+
+    function resetInterval() {
+      if (isPlaying) {
+        clearInterval(interval);
+        interval = setInterval(showNext, delay);
+      }
+    }
+
+    document.getElementById("increaseDelay").addEventListener("click", () => {
+      delay += 1000;
+      updateDelayDisplay();
+      resetInterval();
+    });
+
+    document.getElementById("decreaseDelay").addEventListener("click", () => {
+      if (delay > 1000) {
+        delay -= 1000;
+        updateDelayDisplay();
+        resetInterval();
+      }
+    });
+
+    document.getElementById("next").addEventListener("click", showNext);
+    document.getElementById("prev").addEventListener("click", showPrev);
+    document.getElementById("playPause").addEventListener("click", togglePlayPause);
+
+    updateDelayDisplay();
+    fetchMedia();
   </script>
 </body>
 </html>
