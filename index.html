@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Google Drive Slideshow</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: black;
+      font-family: sans-serif;
+      color: white;
+      overflow: hidden;
+    }
+
+    img, iframe {
+      width: 100vw;
+      height: calc(var(--vh, 1vh) * 100 - 100px);
+      object-fit: contain;
+      display: block;
+      margin: auto;
+      z-index: 0;
+      border: none;
+    }
+
+    iframe {
+      display: none;
+    }
+
+    #footer-row {
+      position: absolute;
+      bottom: 50px; /* reserve space for caption below */
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 20px;
+      z-index: 3;
+    }
+
+    #filename {
+      font-weight: bold;
+    }
+
+    #center-controls {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+    }
+
+    #delay-controls {
+      display: flex;
+      align-items: center;
+    }
+
+    #delay-label {
+      margin-right: 8px;
+    }
+
+    #delay-display {
+      min-width: 50px;
+      text-align: center;
+      padding: 5px 10px;
+      margin: 0 5px;
+      font-size: 1em;
+      background: none;
+      border: none;
+      color: white;
+      font-weight: bold;
+    }
+
+    #caption-text {
+      position: absolute;
+      bottom: 10px;
+      left: 20px;
+      max-width: 90vw;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-style: italic;
+      font-size: 0.95em;
+      color: #ccc;
+      z-index: 3;
+    }
+
+    button {
+      padding: 8px 12px;
+      margin: 5px 0;
+      font-size: 1em;
+      border-radius: 5px;
+      border: 1px solid white;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+  </style>
+</head>
+<body>
+
+  <img id="slideshow" src="" alt="Slideshow">
+  <iframe id="videoFrame" allowfullscreen></iframe>
+
+  <!-- Footer Row: filename (left), controls (centered), delay (right) -->
+  <div id="footer-row">
+    <div id="filename">Loading...</div>
+
+    <div id="center-controls">
+      <button id="prev">Prev</button>
+      <button id="playPause">Pause</button>
+      <button id="next">Next</button>
+      <button id="toggleCaption">Hide Caption</button>
+    </div>
+
+    <div id="delay-controls">
+      <span id="delay-label">Slide delay:</span>
+      <button id="decreaseDelay">-</button>
+      <span id="delay-display">4 sec</span>
+      <button id="increaseDelay">+</button>
+    </div>
+  </div>
+
+  <!-- Caption below buttons -->
+  <div id="caption-text"></div>
+
+  <script>
+    function setVh() {
+      let vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    }
+    setVh();
+    window.addEventListener('resize', setVh);
+
+    const folderId = "1hI-YH9BCq1_KifqWwB6HOipBXIo9XEy4";
+    const apiKey = "AIzaSyDNOs99iC89rCLbHEiLZfwmX9WaMu3dXM4";
+
+    let media = [];
+    let captions = {};
+    let index = 0;
+    let delay = 4000;
+    let interval;
+    let isPlaying = true;
+    let captionVisible = true;
+
+    const img = document.getElementById("slideshow");
+    const video = document.getElementById("videoFrame");
+    const captionFilename = document.getElementById("filename");
+    const captionText = document.getElementById("caption-text");
+    const delayDisplay = document.getElementById("delay-display");
+
+    document.getElementById("toggleCaption").addEventListener("click", () => {
+      captionVisible = !captionVisible;
+      document.getElementById("toggleCaption").innerText = captionVisible ? "Hide Caption" : "Show Caption";
+      showMedia(index);
+    });
+
+    async function fetchCaptions() {
+      try {
+        const res = await fetch("captions.json");
+        const data = await res.json();
+        console.log(`✅ Captions loaded: ${data.length} entries`);
+        data.forEach(item => {
+          if (item.name) {
+            captions[item.name] = {
+              caption: item.caption || "",
+              author: item.author || ""
+            };
+          }
+        });
+      } catch (err) {
+        console.warn("⚠️ Failed to load captions.json:", err);
+      }
+    }
+
+    async function fetchMedia() {
+      const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+(mimeType+contains+'image/' or mimeType+contains+'video/')&fields=files(id,name,mimeType)&key=${apiKey}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      media = data.files.map(file => {
+        const isImage = file.mimeType.startsWith("image/");
+        return {
+          id: file.id,
+          name: file.name,
+          type: isImage ? "image" : "video",
+          url: isImage
+            ? `https://drive.google.com/thumbnail?id=${file.id}&sz=w1000`
+            : `https://drive.google.com/file/d/${file.id}/preview`
+        };
+      });
+    }
+
+    function showMedia(i) {
+      const file = media[i];
+      const fileMeta = captions[file.name];
+      let customCaption = "";
+
+      if (fileMeta && fileMeta.caption) {
+        customCaption = fileMeta.caption;
+        console.log(`📝 Matched caption for ${file.name}: "${fileMeta.caption}"`);
+      } else {
+        if (captionVisible) {
+          console.warn(`⚠️ No caption found for: ${file.name}`);
+          customCaption = "no caption";
+        }
+      }
+
+      captionFilename.textContent = `Slide ${i + 1} of ${media.length}: ${file.name}`;
+      captionText.textContent = captionVisible ? customCaption : "";
+
+      if (file.type === "image") {
+        img.src = file.url;
+        img.style.display = "block";
+        video.style.display = "none";
+      } else {
+        video.src = file.url;
+        video.style.display = "block";
+        img.style.display = "none";
+      }
+    }
+
+    function showNext() {
+      index = (index + 1) % media.length;
+      showMedia(index);
+    }
+
+    function showPrev() {
+      index = (index - 1 + media.length) % media.length;
+      showMedia(index);
+    }
+
+    function togglePlayPause() {
+      if (isPlaying) {
+        clearInterval(interval);
+        document.getElementById("playPause").innerText = "Play";
+      } else {
+        interval = setInterval(showNext, delay);
+        document.getElementById("playPause").innerText = "Pause";
+      }
+      isPlaying = !isPlaying;
+    }
+
+    function updateDelayDisplay() {
+      delayDisplay.textContent = `${delay / 1000} sec`;
+    }
+
+    function resetInterval() {
+      if (isPlaying) {
+        clearInterval(interval);
+        interval = setInterval(showNext, delay);
+      }
+    }
+
+    document.getElementById("increaseDelay").addEventListener("click", () => {
+      delay += 1000;
+      updateDelayDisplay();
+      resetInterval();
+    });
+
+    document.getElementById("decreaseDelay").addEventListener("click", () => {
+      if (delay > 1000) {
+        delay -= 1000;
+        updateDelayDisplay();
+        resetInterval();
+      }
+    });
+
+    document.getElementById("next").addEventListener("click", showNext);
+    document.getElementById("prev").addEventListener("click", showPrev);
+    document.getElementById("playPause").addEventListener("click", togglePlayPause);
+
+    updateDelayDisplay();
+
+    Promise.all([fetchCaptions(), fetchMedia()]).then(() => {
+      if (media.length > 0) {
+        showMedia(0);
+        interval = setInterval(showNext, delay);
+      } else {
+        captionFilename.textContent = "No media found in Google Drive folder.";
+        captionText.textContent = "";
+      }
+    });
+  </script>
+</body>
+</html>
