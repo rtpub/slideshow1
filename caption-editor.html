@@ -86,7 +86,7 @@
 </head>
 <body>
   <h1>Slideshow Caption Editor</h1>
-  <div class="version">v1.0.03</div>
+  <div class="version">v1.0.04</div>
 
   <h3>GitHub Info</h3>
   <input id="ghUser" placeholder="GitHub Username" value="RTpub">
@@ -187,6 +187,9 @@
         const fields = ["caption", "source", "notes"];
         fields.forEach(field => {
           const td = document.createElement('td');
+          nameCell.textContent = file.name;
+          nameCell.style.wordWrap = "break-word";
+          nameCell.style.whiteSpace = "normal";
           const textarea = document.createElement('textarea');
           textarea.className = `${field}-input`;
           textarea.maxLength = 255;
