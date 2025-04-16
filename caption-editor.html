@@ -179,17 +179,23 @@
 
       imageFiles.forEach(file => {
         const row = document.createElement('tr');
-        row.innerHTML = `
-          <td><img src="https://drive.google.com/thumbnail?id=${file.id}&sz=w200" class="thumb" onclick="showPreview('${file.id}')"></td>
-          <td>${file.name}</td>
-        `;
 
-        const fields = ["caption", "source", "notes"];
-        fields.forEach(field => {
+        const thumbCell = document.createElement('td');
+        const img = document.createElement('img');
+        img.src = `https://drive.google.com/thumbnail?id=${file.id}&sz=w200`;
+        img.className = 'thumb';
+        img.onclick = () => showPreview(file.id);
+        thumbCell.appendChild(img);
+        row.appendChild(thumbCell);
+
+        const nameCell = document.createElement('td');
+        nameCell.textContent = file.name;
+        nameCell.style.whiteSpace = "normal";
+        nameCell.style.wordWrap = "break-word";
+        row.appendChild(nameCell);
+
+        ["caption", "source", "notes"].forEach(field => {
           const td = document.createElement('td');
-          nameCell.textContent = file.name;
-          nameCell.style.wordWrap = "break-word";
-          nameCell.style.whiteSpace = "normal";
           const textarea = document.createElement('textarea');
           textarea.className = `${field}-input`;
           textarea.maxLength = 255;
@@ -245,14 +251,12 @@
         notes: values.notes || ""
       }));
 
-      // Show saving popup
       const saveBtn = document.getElementById('saveBtn');
       const statusBox = document.getElementById('saveStatus');
       saveBtn.disabled = true;
       statusBox.style.display = 'block';
 
       try {
-        // JSON save
         const jsonContent = btoa(JSON.stringify(dataArray, null, 2));
         const jsonSha = await getFileSha(ghUser, ghRepo, ghPath, ghBranch, headers);
         const jsonRes = await fetch(`https://api.github.com/repos/${ghUser}/${ghRepo}/contents/${ghPath}`, {
@@ -271,7 +275,6 @@
           return;
         }
 
-        // CSV save
         const csvHeader = ["name", "caption", "source", "notes"];
         const csvLines = dataArray.map(entry =>
           csvHeader.map(f => JSON.stringify(entry[f] || "")).join(",")
@@ -298,7 +301,6 @@
         log("✅ captions.json and captions.csv saved to GitHub!");
         alert("✅ Captions saved to GitHub (JSON + CSV)");
       } finally {
-        // Hide popup and re-enable button
         statusBox.style.display = 'none';
         saveBtn.disabled = false;
       }
