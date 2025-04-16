@@ -22,16 +22,31 @@
       font-family: inherit;
       font-size: inherit;
     }
+    #tableWrapper {
+      max-height: 500px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 20px;
       background: white;
     }
     th, td {
       border: 1px solid #ccc;
       padding: 8px;
       vertical-align: top;
+    }
+    th {
+      background: #eee;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    td:nth-child(2) {
+      white-space: normal;
+      word-break: break-word;
+      max-width: 250px;
     }
     img.thumb {
       height: 60px;
@@ -86,7 +101,7 @@
 </head>
 <body>
   <h1>Slideshow Caption Editor</h1>
-  <div class="version">v1.0.05</div>
+  <div class="version">v1.0.06</div>
 
   <h3>GitHub Info</h3>
   <input id="ghUser" placeholder="GitHub Username" value="RTpub">
@@ -100,12 +115,14 @@
   <input id="driveApiKey" placeholder="Google API Key" value="AIzaSyDNOs99iC89rCLbHEiLZfwmX9WaMu3dXM4">
   <button onclick="loadData()">Load Images & Captions</button>
 
-  <table id="captionTable" style="display:none;">
-    <thead>
-      <tr><th>Image</th><th>Filename</th><th>Caption</th><th>Source</th><th>Notes</th></tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <div id="tableWrapper" style="display:none;">
+    <table id="captionTable">
+      <thead>
+        <tr><th>Image</th><th>Filename</th><th>Caption</th><th>Source</th><th>Notes</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
 
   <button id="saveBtn" style="display:none;" onclick="saveCaptions()">💾 Save Captions</button>
   <button onclick="toggleLog()">🪵 Show/hide debug log</button>
@@ -191,7 +208,8 @@
         const nameCell = document.createElement('td');
         nameCell.textContent = file.name;
         nameCell.style.whiteSpace = "normal";
-        nameCell.style.wordWrap = "break-word";
+        nameCell.style.wordBreak = "break-word";
+        nameCell.style.maxWidth = "250px";
         row.appendChild(nameCell);
 
         ["caption", "source", "notes"].forEach(field => {
@@ -211,7 +229,7 @@
         tbody.appendChild(row);
       });
 
-      document.getElementById('captionTable').style.display = 'table';
+      document.getElementById('tableWrapper').style.display = 'block';
       document.getElementById('saveBtn').style.display = 'inline-block';
     }
 
