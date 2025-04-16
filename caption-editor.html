@@ -25,11 +25,13 @@
     #tableWrapper {
       max-height: 500px;
       overflow-y: auto;
+      overflow-x: hidden;
       border: 1px solid #ccc;
+      margin-top: 15px;
     }
     table {
       width: 100%;
-      border-collapse: collapse;
+      border-collapse: separate;
       background: white;
     }
     th, td {
@@ -37,11 +39,12 @@
       padding: 8px;
       vertical-align: top;
     }
-    th {
-      background: #eee;
+    thead th {
       position: sticky;
       top: 0;
-      z-index: 1;
+      background: #eee;
+      z-index: 2;
+      text-align: left;
     }
     td:nth-child(2) {
       white-space: normal;
@@ -101,7 +104,7 @@
 </head>
 <body>
   <h1>Slideshow Caption Editor</h1>
-  <div class="version">v1.0.06</div>
+  <div class="version">v1.0.07</div>
 
   <h3>GitHub Info</h3>
   <input id="ghUser" placeholder="GitHub Username" value="RTpub">
@@ -207,9 +210,6 @@
 
         const nameCell = document.createElement('td');
         nameCell.textContent = file.name;
-        nameCell.style.whiteSpace = "normal";
-        nameCell.style.wordBreak = "break-word";
-        nameCell.style.maxWidth = "250px";
         row.appendChild(nameCell);
 
         ["caption", "source", "notes"].forEach(field => {
