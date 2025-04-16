@@ -1,0 +1,248 @@
+<<!DOCTYPE html>
+<html>
+<head>
+  <title>Caption Editor (Popup Fix)</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background: #f4f4f4;
+    }
+    input, button {
+      padding: 6px;
+      margin: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background: white;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      vertical-align: middle;
+    }
+    img.thumb {
+      height: 60px;
+      cursor: pointer;
+    }
+    #previewModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    #previewModal img {
+      max-width: 90%;
+      max-height: 90%;
+    }
+    #log {
+      background: #222;
+      color: #0f0;
+      padding: 10px;
+      font-size: 0.85em;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Caption Editor</h1>
+
+  <h3>GitHub Info</h3>
+  <input id="ghUser" placeholder="GitHub Username" value="RTpub">
+  <input id="ghRepo" placeholder="Repository" value="slideshow1">
+  <input id="ghBranch" placeholder="Branch" value="main">
+  <input id="ghPath" placeholder="captions.json path" value="captions.json">
+  <input id="ghToken" placeholder="GitHub Personal Access Token" type="password">
+
+  <h3>Google Drive Info</h3>
+  <input id="driveFolderId" placeholder="Drive Folder ID" value="1hI-YH9BCq1_KifqWwB6HOipBXIo9XEy4">
+  <input id="driveApiKey" placeholder="Google API Key" value="AIzaSyDNOs99iC89rCLbHEiLZfwmX9WaMu3dXM4">
+  <button onclick="loadData()">Load Images & Captions</button>
+
+  <table id="captionTable" style="display:none;">
+    <thead>
+      <tr><th>Image</th><th>Filename</th><th>Caption</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <button id="saveBtn" style="display:none;" onclick="saveCaptions()">💾 Save to GitHub</button>
+
+  <div id="previewModal" onclick="this.style.display='none'"><img src=""></div>
+
+  <pre id="log">[Log output will appear here]</pre>
+
+  <script>
+    let imageFiles = [];
+    let captions = {};
+
+    function log(msg) {
+      console.log(msg);
+      const logBox = document.getElementById('log');
+      logBox.textContent += msg + '\n';
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    async function loadData() {
+      const folderId = document.getElementById('driveFolderId').value;
+      const apiKey = document.getElementById('driveApiKey').value;
+      const ghUser = document.getElementById('ghUser').value;
+      const ghRepo = document.getElementById('ghRepo').value;
+      const ghPath = document.getElementById('ghPath').value;
+      const ghBranch = document.getElementById('ghBranch').value;
+      const token = document.getElementById('ghToken').value;
+
+      const headers = { Authorization: `token ${token}` };
+      let sha = null;
+
+      log("🔄 Fetching captions.json from GitHub...");
+      try {
+        const res = await fetch(`https://api.github.com/repos/${ghUser}/${ghRepo}/contents/${ghPath}?ref=${ghBranch}`, { headers });
+        const data = await res.json();
+        const content = atob(data.content);
+        const parsed = JSON.parse(content);
+
+        log("📥 Raw captions.json content:");
+        log(JSON.stringify(parsed, null, 2));
+
+        if (Array.isArray(parsed)) {
+          captions = {};
+          parsed.forEach(item => {
+            captions[item.name] = {
+              caption: item.caption || "",
+              author: item.author || ""
+            };
+          });
+          log(`✅ Converted ${parsed.length} entries from array`);
+        } else {
+          captions = parsed;
+          log(`✅ Loaded ${Object.keys(captions).length} captions (object format)`);
+        }
+
+        sha = data.sha;
+      } catch (err) {
+        captions = {};
+        log("⚠️ Could not load captions.json — starting fresh.");
+      }
+
+      log("🔄 Fetching image list from Google Drive...");
+      try {
+        const q = encodeURIComponent(`'${folderId}' in parents and mimeType contains 'image/jpeg'`);
+        const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&key=${apiKey}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        imageFiles = data.files;
+        log(`✅ Loaded ${imageFiles.length} image(s) from Drive`);
+      } catch (err) {
+        log("❌ Error loading images from Google Drive.");
+        return;
+      }
+
+      const table = document.getElementById('captionTable');
+      const tbody = table.querySelector('tbody');
+      tbody.innerHTML = '';
+
+      imageFiles.forEach(file => {
+        const row = document.createElement('tr');
+
+        const thumbCell = document.createElement('td');
+        const img = document.createElement('img');
+        img.src = `https://drive.google.com/thumbnail?id=${file.id}&sz=w200`;
+        img.className = 'thumb';
+        img.onclick = () => showPreview(file.id);
+        thumbCell.appendChild(img);
+
+        const nameCell = document.createElement('td');
+        nameCell.textContent = file.name;
+
+        const captionCell = document.createElement('td');
+        const input = document.createElement('input');
+        input.type = 'text';
+        const existingCaption = captions[file.name]?.caption || '';
+        input.value = existingCaption;
+        input.style = 'width: 100%';
+        input.oninput = () => {
+          if (!captions[file.name]) captions[file.name] = {};
+          captions[file.name].caption = input.value;
+        };
+        captionCell.appendChild(input);
+
+        row.appendChild(thumbCell);
+        row.appendChild(nameCell);
+        row.appendChild(captionCell);
+        tbody.appendChild(row);
+      });
+
+      table.style.display = 'table';
+      document.getElementById('saveBtn').style.display = 'inline-block';
+      log("✅ Caption editor ready.");
+    }
+
+    function showPreview(fileId) {
+      const modal = document.getElementById('previewModal');
+      modal.querySelector('img').src = `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+      modal.style.display = 'flex';
+    }
+
+    async function saveCaptions() {
+      const ghUser = document.getElementById('ghUser').value;
+      const ghRepo = document.getElementById('ghRepo').value;
+      const ghPath = document.getElementById('ghPath').value;
+      const ghBranch = document.getElementById('ghBranch').value;
+      const token = document.getElementById('ghToken').value;
+
+      const headers = {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github.v3+json'
+      };
+
+      log("💾 Preparing captions.json for GitHub...");
+
+      let sha = null;
+      try {
+        const res = await fetch(`https://api.github.com/repos/${ghUser}/${ghRepo}/contents/${ghPath}?ref=${ghBranch}`, { headers });
+        const data = await res.json();
+        sha = data.sha;
+        log("📌 Found existing SHA");
+      } catch {}
+
+      const output = Object.entries(captions).map(([name, data]) => ({
+        name,
+        caption: data.caption || "",
+        author: data.author || ""
+      }));
+      const content = btoa(JSON.stringify(output, null, 2));
+
+      const body = {
+        message: "Update captions.json",
+        content: content,
+        branch: ghBranch,
+        ...(sha && { sha })
+      };
+
+      const res = await fetch(`https://api.github.com/repos/${ghUser}/${ghRepo}/contents/${ghPath}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(body)
+      });
+
+      if (res.ok) {
+        log("✅ captions.json saved to GitHub!");
+        alert("✅ captions.json updated successfully!");
+      } else {
+        const errorText = await res.text();
+        log("❌ Failed to save: " + errorText);
+        alert("❌ Failed to update captions.json. See console or log for details.");
+      }
+    }
+  </script>
+</body>
+</html>
