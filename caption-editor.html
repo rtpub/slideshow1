@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Slideshow Caption Editor</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background: #f4f4f4;
+    }
+    h1 {
+      margin-bottom: 0;
+    }
+    .version {
+      font-size: 0.9em;
+      color: #555;
+      margin-bottom: 20px;
+    }
+    input, button, textarea {
+      padding: 6px;
+      margin: 4px;
+      font-family: inherit;
+      font-size: inherit;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background: white;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      vertical-align: top;
+    }
+    img.thumb {
+      height: 60px;
+      cursor: pointer;
+    }
+    #previewModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    #previewModal img {
+      max-width: 90%;
+      max-height: 90%;
+    }
+    #log {
+      background: #222;
+      color: #0f0;
+      padding: 10px;
+      font-size: 0.85em;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      margin-top: 20px;
+      display: none;
+    }
+    textarea.caption-input, textarea.source-input, textarea.notes-input {
+      width: 97%;
+      height: 50px;
+      resize: vertical;
+      word-wrap: break-word;
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: inherit;
+      font-family: inherit;
+    }
+    #saveStatus {
+      display: none;
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeeba;
+      padding: 10px;
+      margin-top: 15px;
+      border-radius: 5px;
+      font-size: 0.95em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Slideshow Caption Editor</h1>
+  <div class="version">v1.0.03</div>
+
+  <h3>GitHub Info</h3>
+  <input id="ghUser" placeholder="GitHub Username" value="RTpub">
+  <input id="ghRepo" placeholder="Repository" value="slideshow1">
+  <input id="ghBranch" placeholder="Branch" value="main">
+  <input id="ghPath" placeholder="captions.json path" value="captions.json">
+  <input id="ghToken" placeholder="GitHub Personal Access Token" type="password">
+
+  <h3>Google Drive Info</h3>
+  <input id="driveFolderId" placeholder="Drive Folder ID" value="1hI-YH9BCq1_KifqWwB6HOipBXIo9XEy4">
+  <input id="driveApiKey" placeholder="Google API Key" value="AIzaSyDNOs99iC89rCLbHEiLZfwmX9WaMu3dXM4">
+  <button onclick="loadData()">Load Images & Captions</button>
+
+  <table id="captionTable" style="display:none;">
+    <thead>
+      <tr><th>Image</th><th>Filename</th><th>Caption</th><th>Source</th><th>Notes</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <button id="saveBtn" style="display:none;" onclick="saveCaptions()">💾 Save Captions</button>
+  <button onclick="toggleLog()">🪵 Show/hide debug log</button>
+
+  <div id="saveStatus">💾 Saving captions... Please wait.</div>
+  <div id="previewModal" onclick="this.style.display='none'"><img src=""></div>
+  <pre id="log">[Log output will appear here]</pre>
+
+  <script>
+    let imageFiles = [];
+    let captions = {};
+
+    function log(msg) {
+      console.log(msg);
+      const logBox = document.getElementById('log');
+      logBox.textContent += msg + '\n';
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function toggleLog() {
+      const logBox = document.getElementById('log');
+      logBox.style.display = (logBox.style.display === 'none') ? 'block' : 'none';
+    }
+
+    async function loadData() {
+      const folderId = document.getElementById('driveFolderId').value;
+      const apiKey = document.getElementById('driveApiKey').value;
+      const ghUser = document.getElementById('ghUser').value;
+      const ghRepo = document.getElementById('ghRepo').value;
+      const ghPath = document.getElementById('ghPath').value;
+      const ghBranch = document.getElementById('ghBranch').value;
+      const token = document.getElementById('ghToken').value;
+
+      const headers = { Authorization: `token ${token}` };
+
+      captions = {};
+      try {
+        const res = await fetch(`https://api.github.com/repos/${ghUser}/${ghRepo}/contents/${ghPath}?ref=${ghBranch}`, { headers });
+        const data = await res.json();
+        const content = atob(data.content);
+        const parsed = JSON.parse(content);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(item => {
+            captions[item.name] = {
+              caption: item.caption || "",
+              source: item.source || "",
+              notes: item.notes || ""
+            };
+          });
+        }
+        log(`✅ Loaded ${Object.keys(captions).length} caption entries`);
+      } catch {
+        log("⚠️ Could not load existing captions.json — will create a new one.");
+      }
+
+      try {
+        const q = encodeURIComponent(`'${folderId}' in parents and mimeType contains 'image/jpeg'`);
+        const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&key=${apiKey}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        imageFiles = data.files;
+        log(`✅ Loaded ${imageFiles.length} image(s) from Drive`);
+      } catch {
+        log("❌ Error loading images from Google Drive.");
+        return;
+      }
+
+      imageFiles.sort((a, b) => a.name.localeCompare(b.name));
+      const tbody = document.querySelector("#captionTable tbody");
+      tbody.innerHTML = '';
+
+      imageFiles.forEach(file => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><img src="https://drive.google.com/thumbnail?id=${file.id}&sz=w200" class="thumb" onclick="showPreview('${file.id}')"></td>
+          <td>${file.name}</td>
+        `;
+
+        const fields = ["caption", "source", "notes"];
+        fields.forEach(field => {
+          const td = document.createElement('td');
+          const textarea = document.createElement('textarea');
+          textarea.className = `${field}-input`;
+          textarea.maxLength = 255;
+          textarea.value = captions[file.name]?.[field] || '';
+          textarea.oninput = () => {
+            if (!captions[file.name]) captions[file.name] = {};
+            captions[file.name][field] = textarea.value;
+          };
+          td.appendChild(textarea);
+          row.appendChild(td);
+        });
+
+        tbody.appendChild(row);
+      });
+
+      document.getElementById('captionTable').style.display = 'table';
+      document.getElementById('saveBtn').style.display = 'inline-block';
+    }
+
+    function showPreview(fileId) {
+      const modal = document.getElementById('previewModal');
+      modal.querySelector('img').src = `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+      modal.style.display = 'flex';
+    }
+
+    async function getFileSha(user, repo, path, branch, headers) {
+      try {
+        const res = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/${path}?ref=${branch}`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          return data.sha;
+        }
+      } catch {}
+      return null;
+    }
+
+    async function saveCaptions() {
+      const ghUser = document.getElementById('ghUser').value;
+      const ghRepo = document.getElementById('ghRepo').value;
+      const ghPath = document.getElementById('ghPath').value;
+      const ghBranch = document.getElementById('ghBranch').value;
+      const token = document.getElementById('ghToken').value;
+      const csvPath = "captions.csv";
+      const headers = {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github.v3+json'
+      };
+
+      const dataArray = Object.entries(captions).map(([name, values]) => ({
+        name,
+        caption: values.caption || "",
+        source: values.source || "",
+        notes: values.notes || ""
+      }));
+
+      // Show saving popup
+      const saveBtn = document.getElementById('saveBtn');
+      const statusBox = document.getElementById('saveStatus');
+      saveBtn.disabled = true;
+      statusBox.style.display = 'block';
+
+      try {
+        // JSON save
+        const jsonContent = btoa(JSON.stringify(dataArray, null, 2));
+        const jsonSha = await getFileSha(ghUser, ghRepo, ghPath, ghBranch, headers);
+        const jsonRes = await fetch(`https://api.github.com/repos/${ghUser}/${ghRepo}/contents/${ghPath}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            message: "Update captions.json",
+            content: jsonContent,
+            branch: ghBranch,
+            ...(jsonSha && { sha: jsonSha })
+          })
+        });
+        if (!jsonRes.ok) {
+          const err = await jsonRes.text();
+          log(`❌ Failed to save captions.json: ${err}`);
+          return;
+        }
+
+        // CSV save
+        const csvHeader = ["name", "caption", "source", "notes"];
+        const csvLines = dataArray.map(entry =>
+          csvHeader.map(f => JSON.stringify(entry[f] || "")).join(",")
+        );
+        csvLines.unshift(csvHeader.join(","));
+        const csvContent = btoa(csvLines.join("\r\n"));
+        const csvSha = await getFileSha(ghUser, ghRepo, csvPath, ghBranch, headers);
+        const csvRes = await fetch(`https://api.github.com/repos/${ghUser}/${ghRepo}/contents/${csvPath}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            message: "Update captions.csv",
+            content: csvContent,
+            branch: ghBranch,
+            ...(csvSha && { sha: csvSha })
+          })
+        });
+        if (!csvRes.ok) {
+          const err = await csvRes.text();
+          log(`❌ Failed to save captions.csv: ${err}`);
+          return;
+        }
+
+        log("✅ captions.json and captions.csv saved to GitHub!");
+        alert("✅ Captions saved to GitHub (JSON + CSV)");
+      } finally {
+        // Hide popup and re-enable button
+        statusBox.style.display = 'none';
+        saveBtn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
