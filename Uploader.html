@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Upload to Google Drive</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    input, button { font-size: 16px; margin-top: 10px; }
+    #log { margin-top: 20px; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <h2>Upload Image to Google Drive</h2>
+  <input type="file" id="fileInput" accept="image/*"><br>
+  <button onclick="uploadFile()">Upload</button>
+  <div id="log"></div>
+
+  <script>
+//    const uploadUrl = 'https://script.google.com/macros/s/AKfycbxTrQVf2d_ZIpbY3rQC88vf4BvodCIx0-bRKO4J8MrDhlmmpDqAmFWoTOkyVXZdV4g0/exec';
+
+      const uploadUrl = 'https://script.google.com/macros/s/AKfycbwQJlCga6wKPbyqnmgtjd9m3kT0WcMlVG4jVZSzBiFAwmcuvbprLJNty2Nrx2BKADvv/exec'
+      
+//https://drive.google.com/drive/folders/1Ia2xJxB9Z3m5UO5rj4ke9quVDf3GBlDv?usp=sharing
+// Script ID:      10j8xcekkbI1Sv-YRJEkbkNlx9Duc97MBYpbPByWHqLVlCi3497C1zzU5
+// Deployment ID:  AKfycbxTrQVf2d_ZIpbY3rQC88vf4BvodCIx0-bRKO4J8MrDhlmmpDqAmFWoTOkyVXZdV4g0
+// testing foldedr id   https://drive.google.com/drive/folders/1Ia2xJxB9Z3m5UO5rj4ke9quVDf3GBlDv
+
+    async function uploadFile() {
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+      if (!file) return log("❌ No file selected.");
+
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result.split(',')[1];
+
+        const form = new FormData();
+        form.append('filedata', base64);
+        form.append('filename', file.name);
+        form.append('mimetype', file.type);
+
+        try {
+          const res = await fetch(uploadUrl, {
+            method: 'POST',
+            body: form
+          });
+          const msg = await res.text();
+          log(msg);
+        } catch (err) {
+          log("❌ Upload error: " + err);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function log(msg) {
+      document.getElementById('log').textContent = msg;
+    }
+  </script>
+</body>
+</html>
