@@ -98,36 +98,6 @@
       z-index: 3;
     }
 
-    #story-button {
-      padding: 8px 12px;
-      font-size: 1em;
-      border-radius: 5px;
-      border: 1px solid white;
-      background: rgba(255, 255, 255, 0.2);
-      color: white;
-      cursor: pointer;
-    }
-
-    #story-button:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-    }
-
-    #story-modal {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.8);
-      color: #eee;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 1.1em;
-      padding: 40px;
-      text-align: center;
-      z-index: 999;
-    }
-
     button {
       padding: 8px 12px;
       margin: 5px 0;
@@ -139,12 +109,30 @@
       cursor: pointer;
     }
 
-    button:hover:enabled {
+    button:hover {
       background: rgba(255, 255, 255, 0.4);
+    }
+
+    #story-popup {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      font-size: 1.2em;
+      z-index: 1000;
+      padding: 20px;
+      box-sizing: border-box;
+      overflow: auto;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
+
   <img id="slideshow" src="" alt="Slideshow">
   <iframe id="videoFrame" allowfullscreen></iframe>
 
@@ -155,7 +143,7 @@
       <button id="prev">Prev</button>
       <button id="playPause">Pause</button>
       <button id="next">Next</button>
-      <button id="story-button" onclick="showStory()">Story</button>
+      <button id="storyBtn" disabled>Story</button>
     </div>
 
     <div id="delay-controls">
@@ -167,8 +155,8 @@
   </div>
 
   <div id="caption-text"></div>
-  <div id="version-text">v1.0</div>
-  <div id="story-modal" onclick="this.style.display='none'"></div>
+  <div id="version-text">v1.01</div>
+  <div id="story-popup"></div>
 
   <script>
     function setVh() {
@@ -178,7 +166,10 @@
     setVh();
     window.addEventListener('resize', setVh);
 
-    const folderId = "1Ia2xJxB9Z3m5UO5rj4ke9quVDf3GBlDv";
+//    const folderId = "1hI-YH9BCq1_KifqWwB6HOipBXIo9XEy4";
+//    const apiKey = "AIzaSyDNOs99iC89rCLbHEiLZfwmX9WaMu3dXM4";
+
+    const folderId = "1Ia2xJxB9Z3m5UO5rj4ke9quVDf3GBlDv"
     const apiKey = "AIzaSyDNOs99iC89rCLbHEiLZfwmX9WaMu3dXM4";
 
     let media = [];
@@ -193,8 +184,8 @@
     const captionFilename = document.getElementById("filename");
     const captionText = document.getElementById("caption-text");
     const delayDisplay = document.getElementById("delay-display");
-    const storyButton = document.getElementById("story-button");
-    const storyModal = document.getElementById("story-modal");
+    const storyBtn = document.getElementById("storyBtn");
+    const storyPopup = document.getElementById("story-popup");
 
     async function fetchCaptions() {
       try {
@@ -216,7 +207,10 @@
     }
 
     async function fetchMedia() {
+//      const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+(mimeType+contains+'image/' or mimeType+contains+'video/')&fields=files(id,name,mimeType)&key=${apiKey}`;
+
       const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+(mimeType+contains+'image/' or mimeType+contains+'video/')&orderBy=name&fields=files(id,name,mimeType)&key=${apiKey}`;
+
       const res = await fetch(url);
       const data = await res.json();
 
@@ -240,7 +234,7 @@
 
       if (fileMeta && fileMeta.caption) {
         customCaption = fileMeta.caption;
-        console.log(`📝 Matched caption for ${file.name}: "${fileMeta.caption}"`);
+        console.log(`📝 Matched caption for ${file.name}: \"${fileMeta.caption}\"`);
       } else {
         console.warn(`⚠️ No caption found for: ${file.name}`);
         customCaption = "no caption";
@@ -248,14 +242,6 @@
 
       captionFilename.textContent = `Slide ${i + 1} of ${media.length}: ${file.name}`;
       captionText.textContent = customCaption;
-
-      if (fileMeta && fileMeta.story) {
-        storyButton.disabled = false;
-        storyButton.setAttribute("data-story", fileMeta.story);
-      } else {
-        storyButton.disabled = true;
-        storyButton.removeAttribute("data-story");
-      }
 
       if (file.type === "image") {
         img.src = file.url;
@@ -266,6 +252,9 @@
         video.style.display = "block";
         img.style.display = "none";
       }
+
+      const story = captions[file.name]?.story?.trim();
+      storyBtn.disabled = !story;
     }
 
     function showNext() {
@@ -300,13 +289,24 @@
       }
     }
 
-    function showStory() {
-      const story = storyButton.getAttribute("data-story");
-      if (story) {
-        storyModal.textContent = story;
-        storyModal.style.display = "flex";
+    storyBtn.addEventListener("click", () => {
+      const file = media[index];
+      const story = captions[file.name]?.story?.trim();
+      if (!story) return;
+
+      if (isPlaying) {
+        clearInterval(interval);
+        document.getElementById("playPause").innerText = "Play";
+        isPlaying = false;
       }
-    }
+
+      storyPopup.textContent = story;
+      storyPopup.style.display = "block";
+    });
+
+    storyPopup.addEventListener("click", () => {
+      storyPopup.style.display = "none";
+    });
 
     document.getElementById("increaseDelay").addEventListener("click", () => {
       delay += 1000;
