@@ -85,6 +85,19 @@
       z-index: 3;
     }
 
+    #version-text {
+  position: absolute;
+  bottom: 10px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-style: italic;
+  font-size: 0.95em;
+  color: #ccc;
+  z-index: 3;
+}
+
     button {
       padding: 8px 12px;
       margin: 5px 0;
@@ -124,6 +137,7 @@
   </div>
 
   <div id="caption-text"></div>
+  <div id="version-text">v1.0</div>
 
   <script>
     function setVh() {
