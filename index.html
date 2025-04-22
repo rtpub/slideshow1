@@ -171,7 +171,10 @@
     }
 
     async function fetchMedia() {
-      const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+(mimeType+contains+'image/' or mimeType+contains+'video/')&fields=files(id,name,mimeType)&key=${apiKey}`;
+//      const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+(mimeType+contains+'image/' or mimeType+contains+'video/')&fields=files(id,name,mimeType)&key=${apiKey}`;
+
+      const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+(mimeType+contains+'image/' or mimeType+contains+'video/')&orderBy=name&fields=files(id,name,mimeType)&key=${apiKey}`;
+
       const res = await fetch(url);
       const data = await res.json();
 
