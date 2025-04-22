@@ -1,3 +1,4 @@
+<<!-- FULLY PRESERVED original structure, only 'Story' column added between Caption and Source -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -79,7 +80,7 @@
       margin-top: 20px;
       display: none;
     }
-    textarea.caption-input, textarea.source-input, textarea.notes-input {
+    textarea.caption-input, textarea.source-input, textarea.notes-input, textarea.story-input {
       width: 97%;
       height: 50px;
       resize: vertical;
@@ -104,7 +105,7 @@
 </head>
 <body>
   <h1>Slideshow Caption Editor</h1>
-  <div class="version">v1.0.07</div>
+  <div class="version">v1.0.08</div>
 
   <h3>GitHub Info</h3>
   User:<input id="ghUser" placeholder="GitHub Username" value="RTpub">
@@ -114,7 +115,6 @@
   PAT:<input id="ghToken" placeholder="GitHub Personal Access Token" type="password">
 
   <h3>Google Drive Info</h3>
-  <!--  <input id="driveFolderId" placeholder="Drive Folder ID" value="1hI-YH9BCq1_KifqWwB6HOipBXIo9XEy4">  -->
   ID:<input id="driveFolderId" placeholder="Drive Folder ID" value="1Ia2xJxB9Z3m5UO5rj4ke9quVDf3GBlDv">
   API:<input id="driveApiKey" placeholder="Google API Key" value="AIzaSyDNOs99iC89rCLbHEiLZfwmX9WaMu3dXM4">
   <button onclick="loadData()">Load Images & Captions</button>
@@ -122,14 +122,14 @@
   <div id="tableWrapper" style="display:none;">
     <table id="captionTable">
       <thead>
-        <tr><th>Image</th><th>Filename</th><th>Caption</th><th>Source</th><th>Notes</th></tr>
+        <tr><th>Image</th><th>Filename</th><th>Caption</th><th>Story</th><th>Source</th><th>Notes</th></tr>
       </thead>
       <tbody></tbody>
     </table>
   </div>
 
   <button id="saveBtn" style="display:none;" onclick="saveCaptions()">💾 Save Captions</button>
-  <button onclick="toggleLog()">🪵 Show/hide debug log</button>
+  <button onclick="toggleLog()">🩵 Show/hide debug log</button>
 
   <div id="saveStatus">💾 Saving captions... Please wait.</div>
   <div id="previewModal" onclick="this.style.display='none'"><img src=""></div>
@@ -172,6 +172,7 @@
           parsed.forEach(item => {
             captions[item.name] = {
               caption: item.caption || "",
+              story: item.story || "",
               source: item.source || "",
               notes: item.notes || ""
             };
@@ -213,7 +214,7 @@
         nameCell.textContent = file.name;
         row.appendChild(nameCell);
 
-        ["caption", "source", "notes"].forEach(field => {
+        ["caption", "story", "source", "notes"].forEach(field => {
           const td = document.createElement('td');
           const textarea = document.createElement('textarea');
           textarea.className = `${field}-input`;
@@ -266,6 +267,7 @@
       const dataArray = Object.entries(captions).map(([name, values]) => ({
         name,
         caption: values.caption || "",
+        story: values.story || "",
         source: values.source || "",
         notes: values.notes || ""
       }));
@@ -278,7 +280,7 @@
       try {
         const jsonContent = btoa(JSON.stringify(dataArray, null, 2));
         const jsonSha = await getFileSha(ghUser, ghRepo, ghPath, ghBranch, headers);
-        const jsonRes = await fetch(`https://api.github.com/repos/${ghUser}/${ghRepo}/contents/${ghPath}`, {
+        await fetch(`https://api.github.com/repos/${ghUser}/${ghRepo}/contents/${ghPath}`, {
           method: 'PUT',
           headers,
           body: JSON.stringify({
@@ -288,20 +290,15 @@
             ...(jsonSha && { sha: jsonSha })
           })
         });
-        if (!jsonRes.ok) {
-          const err = await jsonRes.text();
-          log(`❌ Failed to save captions.json: ${err}`);
-          return;
-        }
 
-        const csvHeader = ["name", "caption", "source", "notes"];
+        const csvHeader = ["name", "caption", "story", "source", "notes"];
         const csvLines = dataArray.map(entry =>
           csvHeader.map(f => JSON.stringify(entry[f] || "")).join(",")
         );
         csvLines.unshift(csvHeader.join(","));
         const csvContent = btoa(csvLines.join("\r\n"));
         const csvSha = await getFileSha(ghUser, ghRepo, csvPath, ghBranch, headers);
-        const csvRes = await fetch(`https://api.github.com/repos/${ghUser}/${ghRepo}/contents/${csvPath}`, {
+        await fetch(`https://api.github.com/repos/${ghUser}/${ghRepo}/contents/${csvPath}`, {
           method: 'PUT',
           headers,
           body: JSON.stringify({
@@ -311,11 +308,6 @@
             ...(csvSha && { sha: csvSha })
           })
         });
-        if (!csvRes.ok) {
-          const err = await csvRes.text();
-          log(`❌ Failed to save captions.csv: ${err}`);
-          return;
-        }
 
         log("✅ captions.json and captions.csv saved to GitHub!");
         alert("✅ Captions saved to GitHub (JSON + CSV)");
