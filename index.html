@@ -10,6 +10,7 @@
       font-family: sans-serif;
       color: white;
       overflow: hidden;
+      opacity: 1 !important;
     }
 
     img, iframe {
@@ -109,7 +110,12 @@
       cursor: pointer;
     }
 
-    button:hover {
+    button:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    button:hover:not(:disabled) {
       background: rgba(255, 255, 255, 0.4);
     }
 
@@ -129,6 +135,7 @@
       overflow: auto;
       cursor: pointer;
     }
+
   </style>
 </head>
 <body>
@@ -155,7 +162,7 @@
   </div>
 
   <div id="caption-text"></div>
-  <div id="version-text">v1.01</div>
+  <div id="version-text">v1.0</div>
   <div id="story-popup"></div>
 
   <script>
@@ -165,9 +172,6 @@
     }
     setVh();
     window.addEventListener('resize', setVh);
-
-//    const folderId = "1hI-YH9BCq1_KifqWwB6HOipBXIo9XEy4";
-//    const apiKey = "AIzaSyDNOs99iC89rCLbHEiLZfwmX9WaMu3dXM4";
 
     const folderId = "1Ia2xJxB9Z3m5UO5rj4ke9quVDf3GBlDv"
     const apiKey = "AIzaSyDNOs99iC89rCLbHEiLZfwmX9WaMu3dXM4";
@@ -207,10 +211,8 @@
     }
 
     async function fetchMedia() {
-//      const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+(mimeType+contains+'image/' or mimeType+contains+'video/')&fields=files(id,name,mimeType)&key=${apiKey}`;
-
       const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+(mimeType+contains+'image/' or mimeType+contains+'video/')&orderBy=name&fields=files(id,name,mimeType)&key=${apiKey}`;
-
+      
       const res = await fetch(url);
       const data = await res.json();
 
@@ -337,6 +339,17 @@
         captionText.textContent = "";
       }
     });
+
+    document.body.style.opacity = '1';
+    document.body.style.transition = 'opacity 0.3s';
+    document.addEventListener('DOMContentLoaded', () => {
+      document.body.style.opacity = '1';
+    });
+    document.addEventListener('click', () => {
+      document.body.style.opacity = '1';
+    });
   </script>
 </body>
 </html>
+
+
